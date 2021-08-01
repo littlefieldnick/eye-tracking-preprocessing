@@ -7,12 +7,23 @@ columnsToKeep:
   - Participant name
   - Recording name
   - Recording timestamp
+  - Presented Stimulus name
   - Pupil diameter left
   - Pupil diameter right
-  - Presented Stimulus name
-  - Eye movement type
   - AOI hit [Box:Bottom]
   - AOI hit [Box:Top]
+  - Eye movement type
+numericalBaseColumns:
+  - Participant name
+  - Recording name
+  - Recording timestamp
+  - Pupil diameter left
+  - Pupil diameter right
+  - AOI hit [Box:Bottom]
+  - AOI hit [Box:Top]
+categoricalBaseColumns:
+  - Eye movement type
+  - Presented Stimulus name
 columnsForPupil:
   - Participant name
   - Recording name

@@ -2,34 +2,47 @@ from sklearn.base import BaseEstimator, TransformerMixin
 import numpy as np
 import pandas as pd
 
-class BaseTransformer(BaseEstimator, TransformerMixin):
+class MissingValTransformer(BaseEstimator, TransformerMixin):
     # Class Constructor
-    def __init__(self, stim_regex, inval_eye_mvmnts, time_since=True):
-        self._stim_regex = stim_regex
-        self._inval_mvmnts = inval_eye_mvmnts
-        self._time_since = time_since
+    def __init__(self, missing_val=-1, replace_val=np.nan):
+        self.missing_val = missing_val
+        self.replace_val = replace_val
 
     # Return self, nothing else to do here
     def fit(self, X, y=None):
         return self
 
     def transform(self, X, y=None):
-        # Check if needed
-        if self._time_since:
-            # create new column
-            X['Time Since Stimulus Appeared'] = X["Recording timestamp"].diff()
-
-        # Filter Stimulus Name
-        mask = X["Presented Stimulus name"].apply(lambda stim: stim is not np.NaN and self._stim_regex.match(stim) is None)
-        X = X.loc[-mask, :]
-
-        # Filter out invalid eye movements
-        mask = X["Eye movement type"].apply(lambda mvmnt: mvmnt in self._inval_mvmnts)
-        X = X.loc[-mask, :]
-
         # Convert -1s in pupil size columns to NaN
-        X["Pupil diameter left"] = X[["Pupil diameter left"]].replace([-1], np.nan)
-        X["Pupil diameter right"] = X[["Pupil diameter right"]].replace([-1], np.nan)
-
-        # returns a numpy array
+        X = X.replace(self.missing_val, self.replace_val)
         return X
+
+class NumericalFeatureCreator(BaseEstimator, TransformerMixin):
+    # Class Constructor
+    def __init__(self):
+        pass
+
+    # Return self, nothing else to do here
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        X.loc[:, "time_since_stimulus_appeared"] = np.nan
+        subs = pd.unique(X["participant_name"])
+        stims = pd.unique(X["presented_stimulus_name"])
+        for sub in subs:
+            for stim in stims:
+                if stim is np.nan:
+                    continue
+
+                stim_times = X[(X["presented_stimulus_name"] == stim) & (X["participant_name"] == sub)][
+                    "recording_timestamp"]
+
+                if len(stim_times) == 0:
+                    continue
+
+                start_timestamp = stim_times.iloc[0]
+                X.loc[stim_times.index, "time_since_stimulus_appeared"] = stim_times - start_timestamp
+
+        return X.loc[:, "time_since_stimulus_appeared"]
+

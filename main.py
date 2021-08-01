@@ -1,44 +1,51 @@
 import argparse
 import re
-from sklearn.preprocessing import Binarizer, LabelBinarizer, OneHotEncoder
-from sklearn.pipeline import Pipeline
+import numpy as np
+
+from sklearn_pandas import DataFrameMapper, gen_features
+from sklearn.preprocessing import OneHotEncoder
+
 from utils.csv import *
 from utils.config import Config
-from transforms.base_transformer import BaseTransformer
-from transforms.feature_selector import FeatureSelector
+from transforms.base_transformer import MissingValTransformer, NumericalFeatureCreator
+from transforms.feature_selector import BaseFeatureSelector
 
 def get_parser():
     parser = argparse.ArgumentParser(description="Preprocess eye tracking data.")
     parser.add_argument("--config", dest="config_file",
                         help="Directory where the configuration file for preprocessing is stored.")
-    parser.add_argument("--preprocess", dest="pre_all", help="Perform all preprocessing steps")
-    parser.add_argument("--step",  dest="pre_step",
-                        help="Perform a specific preprocessing step: Cleaning, Pupil Diameters, or AOI Gaze/Tracking")
     return parser
 
-def run_clean_step():
-    return
+def run_base_clean_step(config, data):
+
+    regex = re.compile(config.get_config_setting("stimulusNameFilter"))
+    inval_mvmnts = config.get_config_setting("invalidEyeMovements")
+    feat_selector = BaseFeatureSelector(config.get_config_setting("columnsToKeep"), regex, inval_mvmnts)
+    feats = feat_selector.fit_transform(data)
+
+    # Build preprocessing steps
+    no_preprocessing = gen_features(columns=["participant_name", "recording_name", "recording_timestamp",
+                                             "presented_stimulus_name"], classes=None)
+    feat_engineer = [(["participant_name","recording_timestamp", "presented_stimulus_name"], NumericalFeatureCreator(), {"alias": "time_since_stimulus_appeared"})]
+    missing_features = gen_features(columns=["pupil_diameter_left", "pupil_diameter_right"],
+                                    classes=[MissingValTransformer])
+    eye_movements = [("eye_movement_type", None)]
+    aoi_features = gen_features(columns=["aoi_hit_[box:bottom]", "aoi_hit_[box:top]"], classes=None)
+
+    # Construct array of all feature preprocessing
+    all_features = no_preprocessing + feat_engineer + eye_movements + missing_features + aoi_features
+
+    mapper = DataFrameMapper(all_features, input_df=True, df_out=True)
+    trans = mapper.fit_transform(feats)
+    trans.to_csv("data/cleaned_test.csv", index=False)
+
+    return trans
 
 def run_pupil_diameter_step():
     return
 
 def run_aoi_step():
     return
-
-def search_column_names(columns, colname):
-    """
-    Search a list of dataset columns for a specific column
-
-    :param columns: Columns in dataset
-    :param colname: Specific column to find
-    :return: i (index for column found) or -1 (column not found)
-    """
-
-    for i, col in enumerate(columns):
-        if col == colname:
-            return i
-
-    return -1
 
 def main():
     parser = get_parser()
@@ -55,19 +62,8 @@ def main():
         print("No CSV files were provided for processing. Exiting...")
         exit(0)
 
-    for csv in config.get_config_setting("filesToProcess"):
-        data = load_csv(csv, low_memory=False)
+    data = load_csv("data/version 1a.csv", low_memory=False)
+    run_base_clean_step(config, data)
 
-        stim_regex = re.compile(config.get_config_setting("stimulusNameFilter"))
-
-        pre_pipeline = Pipeline(steps=[
-            ("feat_selector", FeatureSelector(config.get_config_setting("columnsToKeep"))),
-            ("base_trans", BaseTransformer(stim_regex,
-                                           config.get_config_setting("invalidEyeMovements"),
-                                           time_since=True))
-        ])
-
-        cleaned = pre_pipeline.transform(data)
-        cleaned.to_csv("data/cleaned.csv", index=False)
 if __name__ == "__main__":
     main()
