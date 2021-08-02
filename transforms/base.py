@@ -17,7 +17,7 @@ class MissingValTransformer(BaseEstimator, TransformerMixin):
         X = X.replace(self.missing_val, self.replace_val)
         return X
 
-class NumericalFeatureCreator(BaseEstimator, TransformerMixin):
+class NumericalFeatureEngineer(BaseEstimator, TransformerMixin):
     # Class Constructor
     def __init__(self):
         pass

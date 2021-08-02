@@ -2,8 +2,10 @@ from sklearn.base import BaseEstimator, TransformerMixin
 import numpy as np
 
 class FeatureSelector(BaseEstimator, TransformerMixin):
-    def __init__(self, features, convert_lower=False, space_to_underscore=False):
+    def __init__(self, features, step, dropna=False, convert_lower=False, space_to_underscore=False):
         self.features = features
+        self.step = step
+        self.dropna = dropna
         self.convert_lower = convert_lower
         self.space_to_underscore = space_to_underscore
 
@@ -15,13 +17,22 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
 
     def transform(self, X, y=None):
         if self.convert_lower:
-            X.columns = [col.lower() for col in X.columns]
-            self.features = X.columns
+            self.features = [col.lower() for col in self.features]
+
         if self.space_to_underscore:
-            X.columns = [col.replace(" ", "_") for col in X.columns]
-            self.features = X.columns
+            self.features = [col.replace(" ", "_") for col in self.features]
 
         X = X[self.features]
+        if self.dropna and self.step == "pupil":
+            nas_left = [i for i, val in X["pupil_diameter_left"].iteritems() if np.isnan(val)]
+            nas_right = [i for i, val in X["pupil_diameter_right"].iteritems() if np.isnan(val)]
+
+            X = X.drop(nas_left + nas_right)
+
+        if self.step == "aoi":
+            mask = (X["aoi_hit_[box:bottom]"] == 1) & (X["aoi_hit_[box:top]"] == 1)
+            X = X.loc[-mask, :]
+
         return X
 
 class BaseFeatureSelector(FeatureSelector):
@@ -46,7 +57,6 @@ class BaseFeatureSelector(FeatureSelector):
         self.features = X.columns
 
         X.loc[:, "eye_movement_type"] = X["eye_movement_type"].astype("category")
-        print(X)
         X = self._remove_invalid_eye_mvments(X)
         X = self._filter_stimulus_names(X)
 

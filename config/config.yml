@@ -2,7 +2,6 @@ filesToProcess:
   - /Users/nicklittlefield/PycharmProjects/eye-tracking/data/2538 40 41 42 43.csv
   - /Users/nicklittlefield/PycharmProjects/eye-tracking/data/version 1a.csv
 outdir: data/
-dropna: False
 columnsToKeep:
   - Participant name
   - Recording name
@@ -13,17 +12,6 @@ columnsToKeep:
   - AOI hit [Box:Bottom]
   - AOI hit [Box:Top]
   - Eye movement type
-numericalBaseColumns:
-  - Participant name
-  - Recording name
-  - Recording timestamp
-  - Pupil diameter left
-  - Pupil diameter right
-  - AOI hit [Box:Bottom]
-  - AOI hit [Box:Top]
-categoricalBaseColumns:
-  - Eye movement type
-  - Presented Stimulus name
 columnsForPupil:
   - Participant name
   - Recording name
@@ -34,24 +22,11 @@ columnsForPupil:
 columnsForAOI:
   - Participant name
   - Recording name
+  - Recording timestamp
   - Presented Stimulus name
   - AOI hit [Box:Bottom]
   - AOI hit [Box:Top]
 invalidEyeMovements:
   - EyesNotFound
 stimulusNameFilter: ^[1][ a-zA-Z0-9]*
-aoiColumnsNames:
-  - AOI hit [Box:Bottom]
-  - AOI hit [Box:Top]
-pupilDiameterMissingPlaceholder: NaN
-pupilDiameterMissingVal: -1
-pupilOperation:
-  - difference
-  - average
 pupilThreshold: 0.5
-placeholderForMissingPupil: None
-aoiSheetNames:
-  - aoi_first_glaces.csv
-  - aoi_gaze_tracking.csv
-pupilSheetNames:
-  - pupil.csv
