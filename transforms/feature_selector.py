@@ -23,6 +23,11 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
             self.features = [col.replace(" ", "_") for col in self.features]
 
         X = X[self.features]
+        
+        mask_na = [i for i, val in X["presented_stimulus_name"].iteritems() if val is np.NaN]
+                
+        X = X.drop(mask_na)
+        
         if self.dropna and self.step == "pupil":
             nas_left = [i for i, val in X["pupil_diameter_left"].iteritems() if np.isnan(val)]
             nas_right = [i for i, val in X["pupil_diameter_right"].iteritems() if np.isnan(val)]
@@ -32,7 +37,7 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
         if self.step == "aoi":
             mask = (X["aoi_hit_[box:bottom]"] == 1) & (X["aoi_hit_[box:top]"] == 1)
             X = X.loc[-mask, :]
-
+            
         return X
 
 class BaseFeatureSelector(FeatureSelector):

@@ -73,7 +73,7 @@ def run_aoi_step(config, data):
         "neither": "neither"
     }
 
-    feat_selector = FeatureSelector(config.get_config_setting("columnsForAOI"), "aoi",
+    feat_selector = FeatureSelector(config.get_config_setting("columnsForAOI"), "aoi", dropna=True,
                                     convert_lower=True, space_to_underscore=True)
     feats = feat_selector.transform(data)
 
@@ -82,7 +82,7 @@ def run_aoi_step(config, data):
     for sub in pd.unique(feats["participant_name"]):
         for stim in pd.unique(feats["presented_stimulus_name"]):
             # Filter for the desired stimulus for the given subject
-            stim_data = data[(feats["participant_name"] == sub) \
+            stim_data = feats[(feats["participant_name"] == sub) \
                              & (feats["presented_stimulus_name"] == stim)].reset_index(drop=True)
 
             # Find the gaze changes for the given stimulus
@@ -100,10 +100,10 @@ def run_aoi_step(config, data):
                 aoi_tracks.extend(changes)
                 first_glances.append(glance)
 
-    aoi_track_df = pd.DataFrame(aoi_tracks, columns=["Participant name", "Recording name", "Presented Stimulus name",
-                                                    "AOI Target", "Starting Timestamp", "Time on AOI"])
-    glances_df = pd.DataFrame(first_glances, columns=["Participant name", "Recording name", "Presented Stimulus name",
-                                                      "Starting timestamp", "First glance", "Time till first glance"])
+    aoi_track_df = pd.DataFrame(aoi_tracks, columns=["participant_name", "recording_name", "presented_stimulus_name",
+                                                    "aoi_targ", "start_timestamp", "time_on_aoi"])
+    glances_df = pd.DataFrame(first_glances, columns=["participant_name", "recording_name", "presented_stimulus_name",
+                                                      "start_timestamp", "first_glance", "time_till_first_glance"])
 
     aoi_track_df.to_csv("data/aoi_track.csv", index=False)
     glances_df.to_csv("data/glances.csv", index=False)
@@ -127,6 +127,7 @@ def main():
 
     data = load_csv("data/cleaned_test.csv", low_memory=False)
     # run_base_clean_step(config, data)
+    # pupil = run_pupil_diameter_step(config, data)
     aoi, glances = run_aoi_step(config, data)
 
 if __name__ == "__main__":
