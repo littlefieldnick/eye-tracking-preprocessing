@@ -2,7 +2,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 import numpy as np
 
 class FeatureSelector(BaseEstimator, TransformerMixin):
-    def __init__(self, features, step, dropna=False, convert_lower=False, space_to_underscore=False):
+    def __init__(self, features, step=None, dropna=False, convert_lower=False, space_to_underscore=False):
         self.features = features
         self.step = step
         self.dropna = dropna
@@ -57,6 +57,7 @@ class BaseFeatureSelector(FeatureSelector):
         return X
 
     def transform(self, X, y=None):
+        print(self.features)
         X = X[self.features]
         X.columns = [col.lower().replace(" ", "_") for col in X.columns]
         self.features = X.columns

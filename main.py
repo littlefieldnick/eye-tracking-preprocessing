@@ -1,7 +1,7 @@
 import argparse
 import re
 import numpy as np
-
+import os
 from sklearn_pandas import DataFrameMapper, gen_features
 
 from utils.csv import *
@@ -125,10 +125,25 @@ def main():
         print("No CSV files were provided for processing. Exiting...")
         exit(0)
 
-    data = load_csv("data/cleaned_test.csv", low_memory=False)
-    # run_base_clean_step(config, data)
-    # pupil = run_pupil_diameter_step(config, data)
-    aoi, glances = run_aoi_step(config, data)
+    for file in config.get_config_setting("filesToProcess"):
+        data = load_csv(file, low_memory=False)
+        # Preprocess the data
+        base = run_base_clean_step(config, data)
+        pupil = run_pupil_diameter_step(config, base)
+        aoi, glances = run_aoi_step(config, base)
+
+        # Strip off root directory of data csv and extract only file name
+        file_base = file.split("/")[-1].replace(" ", "_")
+
+        # Remove the .csv ending to append to the end of file name
+        file_base = file_base.split(".csv")[0]
+
+        # Save preprocessed data to csv files
+        df_to_csv(base, os.path.join(config.get_config_setting("outdir"), file_base + "_cleaned.csv"))
+        df_to_csv(pupil, os.path.join(config.get_config_setting("outdir"), file_base + "_pupil_data.csv"))
+        df_to_csv(aoi, os.path.join(config.get_config_setting("outdir"), file_base + "_aoi_tracking.csv"))
+        df_to_csv(glances, os.path.join(config.get_config_setting("outdir"), file_base + "_first_glances.csv"))
+
 
 if __name__ == "__main__":
     main()
