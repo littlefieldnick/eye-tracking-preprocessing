@@ -1,5 +1,9 @@
 filesToProcess:
+  - /Users/nicklittlefield/PycharmProjects/eye-tracking-preprocessing/data/2538 40 41 42 43.csv
   - /Users/nicklittlefield/PycharmProjects/eye-tracking-preprocessing/data/version 1a.csv
+  - /Users/nicklittlefield/PycharmProjects/eye-tracking-preprocessing/data/version 5a.tsv
+  - /Users/nicklittlefield/PycharmProjects/eye-tracking-preprocessing/data/version 8b.tsv
+
 outdir: data/
 columnsToKeep:
   - Participant name

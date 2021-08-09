@@ -1,6 +1,5 @@
 import argparse
 import re
-import numpy as np
 import os
 from sklearn_pandas import DataFrameMapper, gen_features
 
@@ -63,7 +62,6 @@ def run_pupil_diameter_step(config, data):
     all_steps = no_preprocessing + pupil_diff_features + pupil_avg_features + thresh_ops
     mapper = DataFrameMapper(all_steps, input_df=True, df_out=True)
     transformed = mapper.fit_transform(feats)
-    transformed.to_csv("data/pupil_feats.csv", index=False)
     return transformed
 
 def run_aoi_step(config, data):
@@ -109,7 +107,10 @@ def main():
         file_base = file.split("/")[-1].replace(" ", "_")
 
         # Remove the .csv ending to append to the end of file name
-        file_base = file_base.split(".csv")[0]
+        if ".tsv" in file_base:
+            file_base = file_base.split(".tsv")[0]
+        else:
+            file_base = file_base.split(".csv")[0]
 
         # Save preprocessed data to csv files
         df_to_csv(base, os.path.join(config.get_config_setting("outdir"), file_base + "_cleaned.csv"))

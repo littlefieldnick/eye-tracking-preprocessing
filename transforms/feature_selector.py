@@ -52,12 +52,11 @@ class BaseFeatureSelector(FeatureSelector):
         return X
 
     def _filter_stimulus_names(self, X):
-        drop_idx = [i for i, val in X["presented_stimulus_name"].iteritems() if val is not np.NaN and self.stim_filter.match(val) is None]
+        drop_idx = [i for i, val in X["presented_stimulus_name"].iteritems() if val is np.NaN or self.stim_filter.match(val) is None]
         X = X.drop(drop_idx)
         return X
 
     def transform(self, X, y=None):
-        print(self.features)
         X = X[self.features]
         X.columns = [col.lower().replace(" ", "_") for col in X.columns]
         self.features = X.columns
