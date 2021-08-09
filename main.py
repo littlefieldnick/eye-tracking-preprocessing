@@ -2,6 +2,7 @@ import argparse
 import re
 import os
 from sklearn_pandas import DataFrameMapper, gen_features
+from tqdm import tqdm
 
 from utils.csv import *
 from utils.config import Config
@@ -96,7 +97,7 @@ def main():
         print("No CSV files were provided for processing. Exiting...")
         exit(0)
 
-    for file in config.get_config_setting("filesToProcess"):
+    for file in tqdm(config.get_config_setting("filesToProcess")):
         data = load_csv(file, low_memory=False)
         # Preprocess the data
         base = run_base_clean_step(config, data)

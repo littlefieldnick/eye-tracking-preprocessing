@@ -127,12 +127,7 @@ class FirstGlanceFinder(BaseEstimator, TransformerMixin):
                 stim_data = X[(X["participant_name"] == sub) \
                               & (X["presented_stimulus_name"] == stim)].reset_index(drop=True)
 
-                # Find the gaze changes for the given stimulus
-
-                # Find the first glance for the given stimulus
-
                 if len(stim_data) == 0:
-                    print(sub, ":", "Subject never views AOI hit[Box:Bottom] for", stim, "...")
                     nas = [sub, np.nan, stim, np.nan, np.nan, np.nan]
                     first_glances.append(nas)
                 else:
