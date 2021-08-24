@@ -1,56 +1,41 @@
 from sklearn.base import BaseEstimator, TransformerMixin
 import numpy as np
-import pandas as pd
+from sklearn.preprocessing import Binarizer
 
-class PupilOperation(BaseEstimator, TransformerMixin):
-    # Class Constructor
-    def __init__(self, op):
-        self.op = op
 
-    # Return self, nothing else to do here
+class PupilAggregator(BaseEstimator, TransformerMixin):
+
     def fit(self, X, y=None):
         return self
 
-    def _diff(self, X):
-        return X.diff()
-
-    def _avg(self, X):
-        avg = 0
-        for col in X.columns:
-            avg += X.loc[:, col]
-        return avg / len(X.columns)
-
     def transform(self, X, y=None):
-        if self.op == "difference":
-            return self._diff(X)
-        elif self.op == "average":
-            return self._avg(X)
+        X = X.copy()
+        X.loc[:, "diff_pupil_diameter_left"] = np.round(X.loc[:, "pupil_diameter_left"].diff(), 3)
+        X.loc[:, "diff_pupil_diameter_right"] = np.round(X.loc[:, "pupil_diameter_right"].diff(),3)
+
+        X.loc[:, "avg_pupil_diameter"] = np.round((X.loc[:, "pupil_diameter_left"] + X.loc[:, "pupil_diameter_right"]) / 2, 3)
+        X.loc[:, "diff_avg_pupil_diameter"] = np.round(X.loc[:, "avg_pupil_diameter"].diff(), 3)
 
         return X
 
-class PupilSignificance(BaseEstimator, TransformerMixin):
-    # Class Constructor
-    def __init__(self, thresh):
-        self.threshold = thresh
 
-    # Return self, nothing else to do here
+class BinarizerWrapper(BaseEstimator, TransformerMixin):
+    def __init__(self, col, thresh):
+        self.col = col
+        self.thresh = thresh
+
     def fit(self, X, y=None):
         return self
 
-    def _diff(self, X):
-        return X.diff()
-
-    def _avg(self, X):
-        avg = 0
-        for col in X.columns:
-            avg += X.loc[:, col]
-        return avg / len(X.columns)
-
     def transform(self, X, y=None):
-        X = self._avg(X)
-        X = self._diff(X)
+        binarizer = Binarizer(threshold=self.thresh)
 
-        signif_change = X > self.threshold
-        return np.array([1 if signif else 0 for signif in signif_change])
+        # Convert NaN to -1 for thresholding
 
+        X.loc[0, self.col] = -1
+        X.loc[:, "sign_diff_in_pupil_size"] = binarizer.fit_transform([X[self.col]])[0]
 
+        # Convert -1 back to NaN
+        X.loc[0, self.col] = np.NaN
+
+        return X

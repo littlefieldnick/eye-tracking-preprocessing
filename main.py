@@ -1,15 +1,16 @@
 import argparse
 import re
 import os
-from sklearn_pandas import DataFrameMapper, gen_features
+
+from sklearn.pipeline import Pipeline
 from tqdm import tqdm
 
 from utils.csv import *
 from utils.config import Config
-from transforms.base import MissingValTransformer, NumericalFeatureEngineer
-from transforms.aoi import AOITracking, FirstGlanceFinder
-from transforms.pupil import PupilOperation, PupilSignificance
-from transforms.feature_selector import BaseFeatureSelector, FeatureSelector
+from transforms.base import DropByValues, RegexFilter, MissingValueReplacer, BaseNumericalFeatureEngineer
+from transforms.aoi import FirstGlanceFinder, AOITrackingFeatures
+from transforms.pupil import PupilAggregator, BinarizerWrapper
+from transforms.feature_selector import  FeatureSelector
 
 def get_parser():
     parser = argparse.ArgumentParser(description="Preprocess eye tracking data.")
@@ -17,70 +18,59 @@ def get_parser():
                         help="Directory where the configuration file for preprocessing is stored.")
     return parser
 
-def run_base_clean_step(config, data):
-
+def get_base_pipeline(config):
+    cols_to_keep = cols_to_lower(config.get_config_setting("columnsToKeep"))
+    feat_selector = FeatureSelector(cols_to_keep)
     regex = re.compile(config.get_config_setting("stimulusNameFilter"))
-    inval_mvmnts = config.get_config_setting("invalidEyeMovements")
 
-    feat_selector = BaseFeatureSelector(config.get_config_setting("columnsToKeep"), regex, inval_mvmnts)
-    feats = feat_selector.fit_transform(data)
+    pipeline = Pipeline([("feat_sel", feat_selector),
+                         ("inval_mvmnts", DropByValues(["eye_movement_type"], {
+                             "eye_movement_type": config.get_config_setting("invalidEyeMovements")
+                         })),
+                         ("stim_filter", RegexFilter(regex, ["presented_stimulus_name"])),
+                         ("miss_val", MissingValueReplacer(["pupil_diameter_left", "pupil_diameter_right"], {
+                             "pupil_diameter_left": -1,
+                             "pupil_diameter_right": -1
+                         }, {
+                              "pupil_diameter_left": "NaN",
+                               "pupil_diameter_right": "NaN"
+                          })),
+                         ("feat_eng", BaseNumericalFeatureEngineer())])
+    return pipeline
 
-    # Build preprocessing steps
-    no_preprocessing = gen_features(columns=["participant_name", "recording_name", "recording_timestamp",
-                                             "presented_stimulus_name"], classes=None)
-    feat_engineer = [(["participant_name","recording_timestamp", "presented_stimulus_name"], NumericalFeatureEngineer(), {"alias": "time_since_stimulus_appeared"})]
-    missing_features = gen_features(columns=["pupil_diameter_left", "pupil_diameter_right"],
-                                    classes=[MissingValTransformer])
-    eye_movements = [("eye_movement_type", None)]
-    aoi_features = gen_features(columns=["aoi_hit_[box:bottom]", "aoi_hit_[box:top]"], classes=None)
+def get_pupil_pipeline(config):
+    pup_cols_to_keep = cols_to_lower(config.get_config_setting("columnsForPupil"))
 
-    # Construct array of all feature preprocessing
-    all_features = no_preprocessing + feat_engineer + eye_movements + missing_features + aoi_features
+    pup_pipeline = Pipeline([
+        ("pupil_feat", FeatureSelector(pup_cols_to_keep)),
+        ("drop_na", DropByValues(["pupil_diameter_left", "pupil_diameter_right"], {
+            "pupil_diameter_right": ["NaN"],
+            "pupil_diameter_left": ["NaN"]
+        })),
+        ("aggregator", PupilAggregator()),
+        ("signif_change", BinarizerWrapper("diff_avg_pupil_diameter", config.get_config_setting("pupilThreshold")))
+    ])
 
-    mapper = DataFrameMapper(all_features, input_df=True, df_out=True)
-    transformed = mapper.fit_transform(feats)
+    return pup_pipeline
 
-    return transformed
+def get_aoi_pipelines(config):
+    cols_to_keep = cols_to_lower(config.get_config_setting("columnsForAOI"))
+    aoi_cols = cols_to_lower(config.get_config_setting("aoiColumns"))
+    aoi_enc = config.get_config_setting("aoiEncodings")
 
-def run_pupil_diameter_step(config, data):
-    feat_selector = FeatureSelector(config.get_config_setting("columnsForPupil"), "pupil", dropna=True,
-                                    convert_lower=True, space_to_underscore=True)
-    feats = feat_selector.transform(data)
+    tracking_pipeline = Pipeline([
+        ("aoi_feat", FeatureSelector(cols_to_keep)),
+        ("first_glance", AOITrackingFeatures(aoi_cols, aoi_enc))
+    ])
 
-    no_preprocessing = gen_features(columns=["participant_name", "recording_name", "recording_timestamp",
-                                             "presented_stimulus_name", "pupil_diameter_left", "pupil_diameter_right"], classes=None)
+    glance_pipeline = Pipeline([
+        ("aoi_feat", FeatureSelector(cols_to_keep)),
+        ("first_glance", FirstGlanceFinder())
+    ])
+    return tracking_pipeline, glance_pipeline
 
-    pupil_diff_features = gen_features(columns=["pupil_diameter_left", "pupil_diameter_right"],
-                                       classes=[{"class": PupilOperation, "op": "difference"}], prefix="diff_")
-
-    pupil_avg_features = [(["pupil_diameter_left", "pupil_diameter_right"], [PupilOperation("average")], {"alias": "avg_pupil_diameter"}),
-                          (["pupil_diameter_left", "pupil_diameter_right"], [PupilOperation("average"),
-                                                                             PupilOperation("difference")], {"alias": "avg_diff_pupil_diameter"})]
-
-    thresh_ops = [(["pupil_diameter_left", "pupil_diameter_right"], PupilSignificance(thresh=config.get_config_setting("pupilThreshold")),
-                   {"alias": "sign_diff_in_pupil_size"})]
-
-    all_steps = no_preprocessing + pupil_diff_features + pupil_avg_features + thresh_ops
-    mapper = DataFrameMapper(all_steps, input_df=True, df_out=True)
-    transformed = mapper.fit_transform(feats)
-    return transformed
-
-def run_aoi_step(config, data):
-    """
-    Feature engineering for AOI data: First Glances and AOI Gaze Tracking
-
-    :param config: configuration settings
-    :param data: data to transform and process
-    :return:
-    """
-    feat_selector = FeatureSelector(config.get_config_setting("columnsForAOI"), "aoi", dropna=True,
-                                    convert_lower=True, space_to_underscore=True)
-    feats = feat_selector.transform(data)
-
-    aoi_tracker = AOITracking()
-    first_glance_finder = FirstGlanceFinder()
-
-    return aoi_tracker.transform(feats), first_glance_finder.transform(feats)
+def cols_to_lower(columns):
+    return [col.lower().replace(" ", "_") for col in columns]
 
 def main():
     parser = get_parser()
@@ -99,10 +89,17 @@ def main():
 
     for file in tqdm(config.get_config_setting("filesToProcess")):
         data = load_csv(file, low_memory=False)
+        data.columns = cols_to_lower(data.columns)
+
         # Preprocess the data
-        base = run_base_clean_step(config, data)
-        pupil = run_pupil_diameter_step(config, base)
-        aoi, glances = run_aoi_step(config, base)
+        base = get_base_pipeline(config)
+        pupil = get_pupil_pipeline(config)
+        tracking, glances = get_aoi_pipelines(config)
+
+        base_data = base.fit_transform(data)
+        pupil_data = pupil.fit_transform(base_data)
+        tracking_data = tracking.fit_transform(base_data)
+        glance_data = glances.fit_transform(base_data)
 
         # Strip off root directory of data csv and extract only file name
         file_base = file.split("/")[-1].replace(" ", "_")
@@ -114,10 +111,10 @@ def main():
             file_base = file_base.split(".csv")[0]
 
         # Save preprocessed data to csv files
-        df_to_csv(base, os.path.join(config.get_config_setting("outdir"), file_base + "_cleaned.csv"))
-        df_to_csv(pupil, os.path.join(config.get_config_setting("outdir"), file_base + "_pupil_data.csv"))
-        df_to_csv(aoi, os.path.join(config.get_config_setting("outdir"), file_base + "_aoi_tracking.csv"))
-        df_to_csv(glances, os.path.join(config.get_config_setting("outdir"), file_base + "_first_glances.csv"))
+        df_to_csv(base_data, os.path.join(config.get_config_setting("outdir"), file_base + "_cleaned.csv"))
+        df_to_csv(pupil_data, os.path.join(config.get_config_setting("outdir"), file_base + "_pupil_data.csv"))
+        df_to_csv(tracking_data, os.path.join(config.get_config_setting("outdir"), file_base + "_aoi_tracking.csv"))
+        df_to_csv(glance_data, os.path.join(config.get_config_setting("outdir"), file_base + "_first_glances.csv"))
 
 
 if __name__ == "__main__":

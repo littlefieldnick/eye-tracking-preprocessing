@@ -2,13 +2,20 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 
-class AOITracking(BaseEstimator, TransformerMixin):
-    def __init__(self):
-        self.aoi_encoding = {
-                "aoi_hit_[box:top]": "top",
-                "aoi_hit_[box:bottom]": "bottom",
-                "neither": "neither"
-            }
+class AOITrackingFeatures(BaseEstimator, TransformerMixin):
+    def __init__(self, aoi_cols, aoi_encodings):
+        self.columns = aoi_cols
+        self.aoi_encoding = self._process_aoi_encoding_keys(aoi_encodings)
+
+    def _process_aoi_encoding_keys(self, encodings):
+        return {key.lower().replace(" ", "_"): val for key, val in encodings.items()}
+
+    def _find_correct_aoi(self, aoi_data):
+        for col in self.columns:
+            if aoi_data[col]:
+                return self.aoi_encoding[col]
+
+        return self.aoi_encoding["neither"]
 
     def _track_aoi_change(self, stim_data):
         """
@@ -27,12 +34,8 @@ class AOITracking(BaseEstimator, TransformerMixin):
 
         # Figure out where we are staring at when when we start
         start_aoi_data = stim_data.iloc[0]
-        if start_aoi_data["aoi_hit_[box:bottom]"] == 0 and start_aoi_data["aoi_hit_[box:top]"] == 1:
-            aoi = self.aoi_encoding["aoi_hit_[box:top]"]
-        elif start_aoi_data["aoi_hit_[box:bottom]"] == 1 and start_aoi_data["aoi_hit_[box:top]"] == 0:
-            aoi = self.aoi_encoding["aoi_hit_[box:bottom]"]
-        else:
-            aoi = self.aoi_encoding["neither"]
+        aoi = self._find_correct_aoi(start_aoi_data)
+
         changes = []
 
         # Get initial starting time
@@ -41,12 +44,7 @@ class AOITracking(BaseEstimator, TransformerMixin):
         # Loop through data and track AOI changes
         for i, row in stim_data.iterrows():
             prev_aoi = aoi
-            if row["aoi_hit_[box:bottom]"] == 0 and row["aoi_hit_[box:top]"] == 1:
-                aoi = self.aoi_encoding["aoi_hit_[box:top]"]
-            elif row["aoi_hit_[box:bottom]"] == 1 and row["aoi_hit_[box:top]"] == 0:
-                aoi = self.aoi_encoding["aoi_hit_[box:bottom]"]
-            else:
-                aoi = self.aoi_encoding["neither"]
+            aoi = self._find_correct_aoi(row)
 
             if prev_aoi is not aoi:
                 new_start = row["recording_timestamp"]
