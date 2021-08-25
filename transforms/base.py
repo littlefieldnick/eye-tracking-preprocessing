@@ -15,8 +15,8 @@ class DropByValues(BaseEstimator, TransformerMixin):
         X = X.copy()
         drop_idxs = []
         for col in self.cols:
-            if len(self.vals_to_remove[col]) == 1 and self.vals_to_remove[col][0] is 'NaN' or self.vals_to_remove[col][
-                0] is 'nan':
+            if len(self.vals_to_remove[col]) == 1 and self.vals_to_remove[col][0] == 'NaN' or self.vals_to_remove[col][
+                0] == 'nan':
                 drop = [i for i, val in X[col].iteritems() if np.isnan(val)]
             else:
                 drop = [i for i, val in X[col].iteritems() if val in self.vals_to_remove[col]]
