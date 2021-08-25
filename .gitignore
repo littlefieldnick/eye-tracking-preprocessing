@@ -10,9 +10,6 @@ __pycache__/
 # PyCharm
 .idea/
 
-# Skip data directory
-data/
-
 # Distribution / packaging
 .Python
 build/
